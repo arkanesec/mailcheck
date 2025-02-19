@@ -43,7 +43,7 @@ Enter the path to the email file you want to analyze.
 The script will generate a JSON file with the analysis results.
 
 Example
-Bash
+![image](https://github.com/user-attachments/assets/12e7f538-0603-422b-96e5-151e7232d351)
 
 python mailcheck.py
 
