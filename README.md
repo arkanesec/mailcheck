@@ -31,6 +31,7 @@ Install the required packages:
 Bash
 
 pip install -r requirements.txt
+
 Set up API keys (optional but recommended):
 Create environment variables VIRUSTOTAL_API_KEY and URLSCAN_IO_API_KEY with your respective API keys.
 Usage
@@ -40,6 +41,7 @@ Bash
 python mailcheck.py
 Enter the path to the email file you want to analyze.
 The script will generate a JSON file with the analysis results.
+
 Example
 Bash
 
@@ -48,7 +50,8 @@ python mailcheck.py
 Enter email file path: /path/to/suspicious_email.eml
 
 Analysis Results saved to: analysis_results_suspicious_email.eml.json
-Disclaimer
+
+
 This tool is intended for security analysis and research purposes.
 Use it responsibly and ethically.
 The accuracy of the analysis depends on the quality of the data sources and API services used.
