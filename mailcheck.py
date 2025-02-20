@@ -48,7 +48,7 @@ def print_ascii_art():
     ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝╚══════╝ ╚═════╝╚═╝  ╚═╝╚══════╝ ╚═════╝╚═╝  ╚═╝
                                                                             
                     Email Security Analysis & Threat Detection
-                          [ Version 1.5 | @4rk4n3 ]
+                          [ Version 1.0 | @4rk4n3 ]
     """
     print(art)
 
@@ -399,6 +399,94 @@ def save_extracted_items(results: Dict[str, Any], results_dir: str) -> None:
     except Exception as e:
         logger.error(f"Error saving extracted items: {str(e)}")
 
+def save_summary_report(results: Dict[str, Any], results_dir: str) -> None:
+    """Create a summary report of all extracted items."""
+    try:
+        summary_path = os.path.join(results_dir, "extracted_items_summary.txt")
+        
+        # Extract all items
+        domains = set()
+        urls = set()
+        ip_addresses = set()
+        email_addresses = set()
+
+        # Process URLs and their analysis results
+        if "urls" in results:
+            urls.update(results["urls"])
+            
+        if "url_analysis" in results:
+            for analysis in results["url_analysis"]:
+                if "ip_address" in analysis:
+                    ip_addresses.add(analysis["ip_address"])
+                if "url" in analysis:
+                    parsed = urlparse(analysis["url"])
+                    domains.add(parsed.netloc)
+
+        # Extract email addresses from headers
+        headers = results.get("headers", {})
+        email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+        for header in ['From', 'To', 'Cc', 'Bcc', 'Reply-To']:
+            if header in headers:
+                found_emails = re.findall(email_pattern, headers[header])
+                email_addresses.update(found_emails)
+
+        # Write summary report
+        with open(summary_path, 'w', encoding='utf-8') as f:
+            f.write("Email Analysis - Extracted Items Summary\n")
+            f.write("=====================================\n\n")
+            
+            # Write Email Addresses
+            f.write("Email Addresses Found:\n")
+            f.write("--------------------\n")
+            if email_addresses:
+                for email in sorted(email_addresses):
+                    f.write(f"- {email}\n")
+            else:
+                f.write("No email addresses found.\n")
+            f.write("\n")
+            
+            # Write Domains
+            f.write("Domains Found:\n")
+            f.write("-------------\n")
+            if domains:
+                for domain in sorted(domains):
+                    f.write(f"- {domain}\n")
+            else:
+                f.write("No domains found.\n")
+            f.write("\n")
+            
+            # Write IP Addresses
+            f.write("IP Addresses Found:\n")
+            f.write("-----------------\n")
+            if ip_addresses:
+                for ip in sorted(ip_addresses):
+                    f.write(f"- {ip}\n")
+            else:
+                f.write("No IP addresses found.\n")
+            f.write("\n")
+            
+            # Write URLs
+            f.write("URLs Found:\n")
+            f.write("-----------\n")
+            if urls:
+                for url in sorted(urls):
+                    f.write(f"- {url}\n")
+            else:
+                f.write("No URLs found.\n")
+
+            # Add summary counts
+            f.write("\nSummary Counts:\n")
+            f.write("--------------\n")
+            f.write(f"Total Email Addresses: {len(email_addresses)}\n")
+            f.write(f"Total Domains: {len(domains)}\n")
+            f.write(f"Total IP Addresses: {len(ip_addresses)}\n")
+            f.write(f"Total URLs: {len(urls)}\n")
+
+        logger.info(f"Saved summary report to {summary_path}")
+            
+    except Exception as e:
+        logger.error(f"Error saving summary report: {str(e)}")
+
 def main():
     """Main execution function with improved error handling."""
     print_ascii_art()
@@ -436,13 +524,13 @@ def main():
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(results, f, indent=4)
         
-        # Save human-readable findings report
+        # Save all reports
         save_findings_report(results, results_dir)
-        
-        # Save extracted items to separate files
         save_extracted_items(results, results_dir)
+        save_summary_report(results, results_dir)
         
         print(f"\nAnalysis Results saved to: {results_dir}")
+        print(f"Summary report: {os.path.join(results_dir, 'extracted_items_summary.txt')}")
         logger.info("Analysis completed successfully")
 
     except PermissionError:
