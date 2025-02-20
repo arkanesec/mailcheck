@@ -13,6 +13,7 @@ try:
     import json
     import base64
     from urllib.parse import urlparse
+    import time
 except ImportError as e:
     print(f"""
 Error: Missing required modules. Please install them using:
@@ -47,7 +48,7 @@ def print_ascii_art():
     ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝╚══════╝ ╚═════╝╚═╝  ╚═╝╚══════╝ ╚═════╝╚═╝  ╚═╝
                                                                             
                     Email Security Analysis & Threat Detection
-                          [ Version 1.0 | @4rk4n3 ]
+                          [ Version 1.5 | @4rk4n3 ]
     """
     print(art)
 
@@ -300,6 +301,104 @@ def check_urlscan(url: str) -> Dict[str, Any]:
         logger.warning(f"urlscan.io API error: {str(e)}")
         return None
 
+def create_results_directory(email_path: str) -> str:
+    """Create a directory for storing analysis results."""
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    base_name = os.path.splitext(os.path.basename(email_path))[0]
+    results_dir = os.path.join("analysis_results", f"{base_name}_{timestamp}")
+    
+    try:
+        os.makedirs(results_dir, exist_ok=True)
+        logger.info(f"Created results directory: {results_dir}")
+        return results_dir
+    except Exception as e:
+        logger.error(f"Error creating results directory: {str(e)}")
+        raise
+
+def save_findings_report(results: Dict[str, Any], results_dir: str) -> None:
+    """Save a human-readable report of the findings."""
+    try:
+        report_path = os.path.join(results_dir, "findings_report.txt")
+        
+        with open(report_path, 'w', encoding='utf-8') as f:
+            f.write("Email Analysis Findings Report\n")
+            f.write("===========================\n\n")
+            
+            # Write header information
+            f.write("Header Analysis:\n")
+            f.write("-----------------\n")
+            for header, value in results["headers"].items():
+                f.write(f"{header}: {value}\n")
+            
+            # Write suspicious headers if any
+            if "suspicious_headers" in results:
+                f.write("\nSuspicious Headers Found:\n")
+                f.write(f"Return-Path: {results['suspicious_headers']['return_path']}\n")
+                f.write(f"From: {results['suspicious_headers']['from']}\n")
+            
+            # Write attachment information
+            if results.get("attachments"):
+                f.write("\nAttachments Found:\n")
+                f.write("-----------------\n")
+                for att in results["attachments"]:
+                    f.write(f"Filename: {att['filename']}\n")
+                    f.write(f"SHA256: {att['sha256']}\n")
+                    f.write(f"Size: {att['size']} bytes\n")
+                    f.write(f"Content-Type: {att['content_type']}\n\n")
+            
+            logger.info(f"Saved findings report to {report_path}")
+            
+    except Exception as e:
+        logger.error(f"Error saving findings report: {str(e)}")
+
+def save_extracted_items(results: Dict[str, Any], results_dir: str) -> None:
+    """Save extracted URLs, domains, and IPs to separate files."""
+    try:
+        # Extract unique domains from URLs
+        domains = set()
+        urls = set()
+        ip_addresses = set()
+        email_addresses = set()
+
+        # Process URLs and their analysis results
+        if "urls" in results:
+            urls.update(results["urls"])
+            
+        if "url_analysis" in results:
+            for analysis in results["url_analysis"]:
+                if "ip_address" in analysis:
+                    ip_addresses.add(analysis["ip_address"])
+                if "url" in analysis:
+                    parsed = urlparse(analysis["url"])
+                    domains.add(parsed.netloc)
+
+        # Extract email addresses from headers
+        headers = results.get("headers", {})
+        email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+        for header in ['From', 'To', 'Cc', 'Bcc', 'Reply-To']:
+            if header in headers:
+                found_emails = re.findall(email_pattern, headers[header])
+                email_addresses.update(found_emails)
+
+        # Save extracted items to separate files
+        items_to_save = {
+            "urls.txt": urls,
+            "domains.txt": domains,
+            "ip_addresses.txt": ip_addresses,
+            "email_addresses.txt": email_addresses
+        }
+
+        for filename, items in items_to_save.items():
+            if items:
+                filepath = os.path.join(results_dir, filename)
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    for item in sorted(items):
+                        f.write(f"{item}\n")
+                logger.info(f"Saved {len(items)} items to {filepath}")
+
+    except Exception as e:
+        logger.error(f"Error saving extracted items: {str(e)}")
+
 def main():
     """Main execution function with improved error handling."""
     print_ascii_art()
@@ -329,11 +428,21 @@ def main():
         logger.info("Starting email analysis...")
         results = analyze_email(email_message)
         
-        output_file = f"analysis_results_{os.path.basename(email_path)}.json"
-        with open(output_file, 'w', encoding='utf-8') as f:
+        # Create results directory and save findings
+        results_dir = create_results_directory(email_path)
+        
+        # Save the full JSON results
+        json_path = os.path.join(results_dir, "full_analysis.json")
+        with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(results, f, indent=4)
         
-        print(f"\nAnalysis Results saved to: {output_file}")
+        # Save human-readable findings report
+        save_findings_report(results, results_dir)
+        
+        # Save extracted items to separate files
+        save_extracted_items(results, results_dir)
+        
+        print(f"\nAnalysis Results saved to: {results_dir}")
         logger.info("Analysis completed successfully")
 
     except PermissionError:
